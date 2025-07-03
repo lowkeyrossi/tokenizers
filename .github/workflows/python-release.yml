@@ -3,6 +3,7 @@ on:
   push:
     tags:
       - v*
+      - arm_token
 
 env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -48,10 +49,13 @@ jobs:
             target: i686
             python-architecture: x86
             interpreter: 3.9 3.10 3.11 3.12 3.13
-              # - os: windows
-              #   ls: dir
-              #   target: aarch64
-              #   interpreter: 3.11 3.12
+          # Windows 11 ARM64 support
+          - os: windows
+            ls: dir
+            target: aarch64
+            python-architecture: arm64
+            interpreter: 3.11 3.12 3.13
+            runs-on-override: windows-11-arm64
           - os: macos
             target: aarch64
             interpreter: 3.9 3.10 3.11 3.12 3.13 pypy3.9 pypy3.10
@@ -83,19 +87,8 @@ jobs:
             platform: linux
             target: s390x
             interpreter: 3.9 3.10 3.11 3.12 3.13
-        exclude:
-          - os: windows
-            target: aarch64
-              #   # Optimized PGO builds for x86_64 manylinux and windows follow a different matrix,
-              #   # maybe in future maturin-action can support this automatically
-              #   - os: ubuntu
-              #     target: x86_64
-              #     manylinux: auto
-              #   - os: windows
-              #     target: x86_64
-              # Windows on arm64 only supports Python 3.11+
 
-    runs-on: ${{ matrix.os }}-latest
+    runs-on: ${{ matrix.runs-on-override || format('{0}-latest', matrix.os) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -126,8 +119,9 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: pypi_files-${{ matrix.os }}-${{ matrix.target }}-${{ matrix.manylinux }}
+          name: pypi_files-${{ matrix.os }}-${{ matrix.target }}-${{ matrix.manylinux || 'auto' }}
           path: ./bindings/python/dist
+
   build-sdist:
     name: build sdist
     needs: [lock_exists]
@@ -144,7 +138,6 @@ jobs:
         with:
           name: pypi_files-srt
           path: ./bindings/python/dist
-
 
   upload_package:
     name: Upload package to PyPi
